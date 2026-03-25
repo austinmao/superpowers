@@ -1,12 +1,12 @@
-# Superpowers Wrapper for OpenClaw
+# Superpowers for OpenClaw
 
-This wrapper enables OpenClaw to discover and load skills from the [Superpowers](https://github.com/obra/superpowers) framework.
-By symlinking skills into OpenClaw's local skills directory, you keep installation simple and updates easy.
+This integration installs Superpowers as a native OpenClaw plugin. The plugin declares
+its `./skills` directory directly in `openclaw.plugin.json`, so OpenClaw can discover
+the skill pack without symlinking anything into `~/.openclaw/skills`.
 
 ## Section 1 — Prerequisites
 
 - **OpenClaw** is installed and configured.
-- A workspace with an `AGENTS.md` exists (or you know where to create it).
 - `git` is available in your shell.
 
 ## Section 2 — Automated Setup (Recommended)
@@ -21,9 +21,8 @@ By default, it uses:
 
 - Repo: `https://github.com/obra/superpowers.git`
 - Ref: `main`
-- Clone dir: `~/.superpowers`
-- Skills dir: `~/.openclaw/skills`
-- Workspace AGENTS path: `~/.openclaw/workspace/AGENTS.md`
+- Clone dir: `~/.openclaw/vendor/superpowers`
+- Plugin id: `superpowers-openclaw`
 
 ### Optional overrides
 
@@ -32,7 +31,7 @@ You can override defaults with environment variables:
 ```bash
 SUPERPOWERS_REPO_URL="https://github.com/caasols/superpowers.git" \
 SUPERPOWERS_REPO_REF="feat/openclaw-wrapper" \
-OPENCLAW_WORKSPACE_AGENTS="$HOME/.openclaw/workspace/AGENTS.md" \
+SUPERPOWERS_DIR="$HOME/.openclaw/vendor/superpowers-dev" \
 ./setup.sh
 ```
 
@@ -41,45 +40,44 @@ Useful variables:
 - `SUPERPOWERS_REPO_URL`
 - `SUPERPOWERS_REPO_REF`
 - `SUPERPOWERS_DIR`
-- `OPENCLAW_SKILLS_DIR`
-- `OPENCLAW_WORKSPACE_AGENTS`
 
 ## Section 3 — Manual Setup
 
 ```bash
 # Clone superpowers to a stable location
-git clone https://github.com/obra/superpowers.git ~/.superpowers
+git clone https://github.com/obra/superpowers.git ~/.openclaw/vendor/superpowers
 
-# Symlink skills into OpenClaw's local skills directory
-mkdir -p ~/.openclaw/skills
-for skill in ~/.superpowers/skills/*; do
-  [ -d "$skill" ] || continue
-  skill_name="$(basename "$skill")"
-  target=~/.openclaw/skills/"$skill_name"
-  [ -e "$target" ] || ln -s "$skill" "$target"
-done
+# Register the repo as a linked OpenClaw plugin
+openclaw plugins install --link ~/.openclaw/vendor/superpowers
+openclaw plugins enable superpowers-openclaw
+
+# Restart the gateway so long-lived sessions pick up the plugin
+openclaw gateway restart
 ```
 
-Then append `.openclaw/AGENTS-snippet.md` to your workspace `AGENTS.md`.
+No `AGENTS.md` snippet is required. The plugin injects its guidance through the
+OpenClaw `before_prompt_build` hook and exposes the skills through the plugin manifest.
 
 ## Section 4 — Verify Installation
 
-If `openclaw` is available in `PATH`:
-
 ```bash
+openclaw plugins info superpowers-openclaw --json
 openclaw skills info using-superpowers
 ```
 
-You should see the skill resolved from local storage.
+You should see the plugin loaded and the `using-superpowers` skill resolved from the
+linked repo.
 
 ## Section 5 — Keeping Skills Updated
 
-Recommended: re-run `./setup.sh`, which updates the configured repo/ref and handles `SUPERPOWERS_REPO_REF` correctly.
+Recommended: re-run `./setup.sh`, which updates the configured repo/ref, refreshes the
+linked plugin, and restarts the gateway.
 
 If updating manually, pull an explicit ref:
 
 ```bash
-cd ~/.superpowers && git pull origin <branch-or-ref>
+cd ~/.openclaw/vendor/superpowers && git pull origin <branch-or-ref>
+openclaw gateway restart
 ```
 
-No reinstall required.
+No relinking or symlink maintenance required.

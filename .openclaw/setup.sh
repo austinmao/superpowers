@@ -4,29 +4,23 @@ set -euo pipefail
 # Configurable inputs (override via env vars)
 SUPERPOWERS_REPO_URL="${SUPERPOWERS_REPO_URL:-https://github.com/obra/superpowers.git}"
 SUPERPOWERS_REPO_REF="${SUPERPOWERS_REPO_REF:-main}"
-SUPERPOWERS_DIR="${SUPERPOWERS_DIR:-$HOME/.superpowers}"
-OPENCLAW_SKILLS_DIR="${OPENCLAW_SKILLS_DIR:-$HOME/.openclaw/skills}"
-WORKSPACE_AGENTS="${OPENCLAW_WORKSPACE_AGENTS:-$HOME/.openclaw/workspace/AGENTS.md}"
-WRAPPER_MARKER="<!-- superpowers-openclaw-wrapper -->"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SNIPPET_FILE="$SCRIPT_DIR/AGENTS-snippet.md"
+SUPERPOWERS_DIR="${SUPERPOWERS_DIR:-$HOME/.openclaw/vendor/superpowers}"
+PLUGIN_ID="superpowers-openclaw"
 
 # Preflight checks
 if ! command -v git >/dev/null 2>&1; then
   echo "ERROR: git is required but not found in PATH."
   exit 1
 fi
-if [ ! -r "$SNIPPET_FILE" ]; then
-  echo "ERROR: AGENTS-snippet.md not found or not readable at $SNIPPET_FILE"
+if ! command -v openclaw >/dev/null 2>&1; then
+  echo "ERROR: openclaw is required but not found in PATH."
   exit 1
 fi
 
-echo "Superpowers OpenClaw wrapper config:"
+echo "Superpowers OpenClaw plugin config:"
 echo "  SUPERPOWERS_REPO_URL=$SUPERPOWERS_REPO_URL"
 echo "  SUPERPOWERS_REPO_REF=$SUPERPOWERS_REPO_REF"
 echo "  SUPERPOWERS_DIR=$SUPERPOWERS_DIR"
-echo "  OPENCLAW_SKILLS_DIR=$OPENCLAW_SKILLS_DIR"
-echo "  WORKSPACE_AGENTS=$WORKSPACE_AGENTS"
 
 # 1) Clone or update superpowers
 if [ ! -d "$SUPERPOWERS_DIR/.git" ]; then
@@ -45,58 +39,34 @@ else
   git -C "$SUPERPOWERS_DIR" checkout -B "$SUPERPOWERS_REPO_REF" FETCH_HEAD
 fi
 
-# 2) Create target skills dir
-mkdir -p "$OPENCLAW_SKILLS_DIR"
-
-# 3) Symlink all skill directories
-if [ ! -d "$SUPERPOWERS_DIR/skills" ]; then
-  echo "ERROR: skills directory not found at $SUPERPOWERS_DIR/skills"
+# 2) Verify plugin files exist
+if [ ! -f "$SUPERPOWERS_DIR/openclaw.plugin.json" ]; then
+  echo "ERROR: openclaw.plugin.json not found at $SUPERPOWERS_DIR/openclaw.plugin.json"
+  exit 1
+fi
+if [ ! -f "$SUPERPOWERS_DIR/package.json" ]; then
+  echo "ERROR: package.json not found at $SUPERPOWERS_DIR/package.json"
   exit 1
 fi
 
-echo "Creating symlinks..."
-for skill_dir in "$SUPERPOWERS_DIR"/skills/*; do
-  [ -d "$skill_dir" ] || continue
-  skill_name="$(basename "$skill_dir")"
-  target="$OPENCLAW_SKILLS_DIR/$skill_name"
-  if [ -L "$target" ]; then
-    current_target="$(readlink "$target" || true)"
-    if [ "$current_target" != "$skill_dir" ] || [ ! -e "$target" ]; then
-      rm "$target"
-      ln -s "$skill_dir" "$target"
-      echo "  Linked $skill_name"
-    else
-      echo "  Skipped $skill_name (already exists)"
-    fi
-  elif [ ! -e "$target" ]; then
-    ln -s "$skill_dir" "$target"
-    echo "  Linked $skill_name"
-  else
-    echo "  Skipped $skill_name (already exists)"
-  fi
-done
-
-# 4) Inject AGENTS snippet if not already present
-if [ -f "$WORKSPACE_AGENTS" ]; then
-  if grep -q "$WRAPPER_MARKER" "$WORKSPACE_AGENTS"; then
-    echo "Wrapper snippet already present in $WORKSPACE_AGENTS. Skipping snippet injection."
-  else
-    echo "Injecting Superpowers block into $WORKSPACE_AGENTS..."
-    echo "" >> "$WORKSPACE_AGENTS"
-    cat "$SNIPPET_FILE" >> "$WORKSPACE_AGENTS"
-    echo "Snippet injected."
-  fi
+# 3) Install the linked plugin once, then just re-enable on updates
+if openclaw plugins info "$PLUGIN_ID" --json >/dev/null 2>&1; then
+  echo "OpenClaw plugin already registered. Reusing existing link."
 else
-  echo "Workspace AGENTS.md not found at $WORKSPACE_AGENTS."
-  echo "Please manually append $SNIPPET_FILE to your AGENTS.md when ready."
+  echo "Installing linked OpenClaw plugin..."
+  openclaw plugins install --link "$SUPERPOWERS_DIR"
+fi
+openclaw plugins enable "$PLUGIN_ID"
+
+# 4) Restart the gateway so long-lived sessions pick up the plugin
+echo "Restarting OpenClaw gateway..."
+if ! openclaw gateway restart; then
+  echo "WARNING: gateway restart failed. Run 'openclaw gateway restart' manually."
 fi
 
-# 5) Optional verification
+# 5) Verify installation
 echo "Verifying installation..."
-if command -v openclaw >/dev/null 2>&1; then
-  openclaw skills info using-superpowers || echo "Skill check failed, check openclaw configuration."
-else
-  echo "openclaw command not found in PATH, skipping automatic verification."
-fi
+openclaw plugins info "$PLUGIN_ID" --json || echo "Plugin info check failed."
+openclaw skills info using-superpowers || echo "Skill check failed, check openclaw configuration."
 
-echo "Superpowers OpenClaw Wrapper installation complete!"
+echo "Superpowers OpenClaw plugin installation complete!"

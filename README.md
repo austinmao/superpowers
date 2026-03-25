@@ -71,6 +71,19 @@ Fetch and follow instructions from https://raw.githubusercontent.com/obra/superp
 
 **Detailed docs:** [docs/README.opencode.md](docs/README.opencode.md)
 
+### OpenClaw
+
+Clone the repo somewhere stable, then register it as a linked OpenClaw plugin:
+
+```bash
+git clone https://github.com/obra/superpowers.git ~/.openclaw/vendor/superpowers
+openclaw plugins install --link ~/.openclaw/vendor/superpowers
+openclaw plugins enable superpowers-openclaw
+openclaw gateway restart
+```
+
+**Detailed docs:** [.openclaw/INSTALL.md](.openclaw/INSTALL.md)
+
 ### Verify Installation
 
 Start a new session in your chosen platform and ask for something that should trigger a skill (for example, "help me plan this feature" or "let's debug this issue"). The agent should automatically invoke the relevant superpowers skill.

@@ -1,0 +1,16 @@
+{
+  "name": "superpowers-openclaw",
+  "version": "0.1.0",
+  "private": true,
+  "main": ".openclaw/index.ts",
+  "files": [
+    ".openclaw/index.ts",
+    "openclaw.plugin.json",
+    "skills"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./.openclaw/index.ts"
+    ]
+  }
+}

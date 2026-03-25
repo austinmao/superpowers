@@ -1,0 +1,24 @@
+{
+  "id": "superpowers-openclaw",
+  "name": "Superpowers for OpenClaw",
+  "version": "0.1.0",
+  "description": "Expose the Superpowers skill pack through plugin-declared skill paths and optional prompt guidance.",
+  "skills": [
+    "./skills"
+  ],
+  "entrypoint": ".openclaw/index.ts",
+  "hooks": {
+    "before_prompt_build": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "injectGuidance": {
+        "type": "boolean",
+        "default": true,
+        "description": "Inject Superpowers usage guidance into the system prompt."
+      }
+    }
+  }
+}
